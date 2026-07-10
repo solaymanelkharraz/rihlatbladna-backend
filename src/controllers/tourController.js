@@ -42,6 +42,7 @@ export const mapTourResponse = (dbTour) => {
     agencyId: dbTour.agency_id,
     agencyName: dbTour.agency_name || 'Atlas Nomads Travel',
     agencyAvatar: dbTour.agency_avatar || '/MorP.jpg',
+    isBoosted: !!dbTour.is_boosted,
     createdAt: dbTour.created_at
   };
 };
@@ -323,5 +324,48 @@ export const toggleWishlist = async (req, res) => {
   } catch (error) {
     console.error('Error toggling wishlist:', error);
     return res.status(500).json({ success: false, message: 'Server error toggling wishlist' });
+  }
+};
+
+/**
+ * Toggle Boost for a tour (Agency only)
+ * @route PUT /api/tours/:id/boost
+ * @access Private (Agency owner only)
+ */
+export const toggleBoostTour = async (req, res) => {
+  const { id } = req.params;
+  const agencyId = req.user.id;
+
+  try {
+    // Check if tour exists and check ownership
+    const [existing] = await pool.query('SELECT agency_id, is_boosted FROM tours WHERE id = ?', [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ success: false, message: 'Tour experience not found' });
+    }
+
+    if (existing[0].agency_id !== agencyId && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'You do not have permission to boost this tour' });
+    }
+
+    const newBoostStatus = !existing[0].is_boosted;
+
+    await pool.query('UPDATE tours SET is_boosted = ? WHERE id = ?', [newBoostStatus, id]);
+
+    // Fetch the updated tour
+    const [rows] = await pool.query(`
+      SELECT t.*, u.name as agency_name, u.avatar_url as agency_avatar 
+      FROM tours t
+      JOIN users u ON t.agency_id = u.id
+      WHERE t.id = ?
+    `, [id]);
+
+    return res.status(200).json({
+      success: true,
+      message: newBoostStatus ? 'Tour boosted successfully! 🚀' : 'Tour unboosted successfully.',
+      tour: mapTourResponse(rows[0])
+    });
+  } catch (error) {
+    console.error('Error toggling tour boost:', error);
+    return res.status(500).json({ success: false, message: 'Server error toggling tour boost' });
   }
 };
