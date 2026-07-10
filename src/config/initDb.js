@@ -1,0 +1,428 @@
+import pool from './db.js';
+
+const initDb = async () => {
+  console.log('🔄 Initializing database schemas...');
+  let connection;
+
+  try {
+    connection = await pool.getConnection();
+    
+    // Disable foreign key checks to avoid ordering issues during drop/recreate
+    await connection.query('SET FOREIGN_KEY_CHECKS = 0');
+
+    // Drop tables if they exist to force re-seeding
+    console.log('🗑️ Dropping existing tables for a clean re-seed...');
+    await connection.query('DROP TABLE IF EXISTS messages');
+    await connection.query('DROP TABLE IF EXISTS chats');
+    await connection.query('DROP TABLE IF EXISTS user_wishlist');
+    await connection.query('DROP TABLE IF EXISTS user_follows');
+    await connection.query('DROP TABLE IF EXISTS bookings');
+    await connection.query('DROP TABLE IF EXISTS post_comments');
+    await connection.query('DROP TABLE IF EXISTS post_likes');
+    await connection.query('DROP TABLE IF EXISTS posts');
+    await connection.query('DROP TABLE IF EXISTS tours');
+    await connection.query('DROP TABLE IF EXISTS users');
+
+    // 1. Users Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        role ENUM('traveler', 'agency', 'admin') NOT NULL,
+        location VARCHAR(255),
+        avatar_url VARCHAR(500),
+        cover_url VARCHAR(500),
+        is_verified BOOLEAN DEFAULT FALSE,
+        story_image_url VARCHAR(500),
+        story_created_at TIMESTAMP NULL DEFAULT NULL,
+        bio VARCHAR(1000) DEFAULT NULL,
+        rating DECIMAL(3, 2) DEFAULT 5.00,
+        followers_count INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+    console.log('✅ "users" table verified.');
+
+    // 2. Tours Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS tours (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        agency_id INT NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        price DECIMAL(10, 2) NOT NULL,
+        location VARCHAR(255) NOT NULL,
+        duration VARCHAR(100) NOT NULL,
+        description TEXT NOT NULL,
+        image_url VARCHAR(500),
+        included JSON DEFAULT NULL,
+        not_included JSON DEFAULT NULL,
+        tags JSON DEFAULT NULL,
+        status ENUM('Active', 'Archived') DEFAULT 'Active',
+        views INT DEFAULT 0,
+        rating DECIMAL(3, 2) DEFAULT 4.80,
+        reviews_count INT DEFAULT 0,
+        is_boosted BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_tours_agency FOREIGN KEY (agency_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+    console.log('✅ "tours" table verified.');
+
+    // 3. Posts Table (Community Feed)
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS posts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        agency_id INT NOT NULL,
+        location VARCHAR(255),
+        image_url VARCHAR(500),
+        content TEXT NOT NULL,
+        has_offer BOOLEAN DEFAULT FALSE,
+        offer_link_id INT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_posts_agency FOREIGN KEY (agency_id) REFERENCES users(id) ON DELETE CASCADE,
+        CONSTRAINT fk_posts_tour FOREIGN KEY (offer_link_id) REFERENCES tours(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+    console.log('✅ "posts" table verified.');
+
+    // 4. Post Likes Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS post_likes (
+        post_id INT NOT NULL,
+        user_id INT NOT NULL,
+        PRIMARY KEY (post_id, user_id),
+        CONSTRAINT fk_likes_post FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+        CONSTRAINT fk_likes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    console.log('✅ "post_likes" table verified.');
+
+    // 5. Post Comments Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS post_comments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        post_id INT NOT NULL,
+        user_id INT NOT NULL,
+        text TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_comments_post FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+        CONSTRAINT fk_comments_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+    console.log('✅ "post_comments" table verified.');
+
+    // 6. Bookings Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS bookings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        traveler_id INT NOT NULL,
+        agency_id INT NOT NULL,
+        tour_id INT NOT NULL,
+        traveler_phone VARCHAR(50) NOT NULL,
+        status ENUM('New', 'Contacted', 'Booked', 'Cancelled') DEFAULT 'New',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_bookings_traveler FOREIGN KEY (traveler_id) REFERENCES users(id) ON DELETE CASCADE,
+        CONSTRAINT fk_bookings_agency FOREIGN KEY (agency_id) REFERENCES users(id) ON DELETE CASCADE,
+        CONSTRAINT fk_bookings_tour FOREIGN KEY (tour_id) REFERENCES tours(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+    console.log('✅ "bookings" table verified.');
+
+    // 7. User Follows Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS user_follows (
+        follower_id INT NOT NULL,
+        agency_id INT NOT NULL,
+        PRIMARY KEY (follower_id, agency_id),
+        CONSTRAINT fk_follows_follower FOREIGN KEY (follower_id) REFERENCES users(id) ON DELETE CASCADE,
+        CONSTRAINT fk_follows_agency FOREIGN KEY (agency_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    console.log('✅ "user_follows" table verified.');
+
+    // 8. User Wishlist Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS user_wishlist (
+        user_id INT NOT NULL,
+        tour_id INT NOT NULL,
+        PRIMARY KEY (user_id, tour_id),
+        CONSTRAINT fk_wishlist_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        CONSTRAINT fk_wishlist_tour FOREIGN KEY (tour_id) REFERENCES tours(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    console.log('✅ "user_wishlist" table verified.');
+
+    // 9. Chats Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS chats (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        traveler_id INT NOT NULL,
+        agency_id INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uq_traveler_agency (traveler_id, agency_id),
+        CONSTRAINT fk_chats_traveler FOREIGN KEY (traveler_id) REFERENCES users(id) ON DELETE CASCADE,
+        CONSTRAINT fk_chats_agency FOREIGN KEY (agency_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+    console.log('✅ "chats" table verified.');
+
+    // 10. Messages Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS messages (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        chat_id INT NOT NULL,
+        sender_id INT NOT NULL,
+        message_text TEXT NOT NULL,
+        is_read BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_messages_chat FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE,
+        CONSTRAINT fk_messages_sender FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+    console.log('✅ "messages" table verified.');
+
+    // Re-enable foreign key checks
+    await connection.query('SET FOREIGN_KEY_CHECKS = 1');
+
+    // 11. Seeding Clean Data
+    console.log('🌱 Seeding initial test data with local images...');
+
+    // Pre-hashed password: 'password123'
+    const hashedPassword = '$2b$10$Fzoh0ADJaqYv.tsiuJib9eNByVag9Z3rLGSJbo6Q74E9f4rCXAnzC';
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+
+    // Seed Agency 1 (Atlas Nomads Travel)
+    const [agency1Result] = await connection.query(`
+      INSERT INTO users (name, email, password, role, location, avatar_url, cover_url, is_verified, story_image_url, story_created_at, bio, rating, followers_count)
+      VALUES (
+        'Atlas Nomads Travel', 
+        'agency@example.com', 
+        ?, 
+        'agency', 
+        'Merzouga, Morocco', 
+        '/agency2.jpg.jpg', 
+        '/morocco1.jpg', 
+        true,
+        '/sahara-desert-maroc-marrocain-8.webp',
+        ?,
+        'Leading local guide agency in Merzouga specializing in luxury desert tours and camel expeditions.',
+        4.90,
+        12400
+      )
+    `, [hashedPassword, now]);
+    const agency1Id = agency1Result.insertId;
+
+    // Seed Agency 2 (BlueCity Guides)
+    const [agency2Result] = await connection.query(`
+      INSERT INTO users (name, email, password, role, location, avatar_url, cover_url, is_verified, story_image_url, story_created_at, bio, rating, followers_count)
+      VALUES (
+        'BlueCity Guides', 
+        'bluecity@example.com', 
+        ?, 
+        'agency', 
+        'Chefchaouen, Morocco', 
+        '/MorP.jpg', 
+        '/Fes.jpg', 
+        true,
+        '/Chefchaouen-tours.jpg',
+        ?,
+        'Authentic cultural tours of the blue city of Chefchaouen and day hikes into the Rif Mountains.',
+        4.80,
+        8900
+      )
+    `, [hashedPassword, now]);
+    const agency2Id = agency2Result.insertId;
+
+    // Seed Agency 3 (Marrakech Desert Star)
+    const [agency3Result] = await connection.query(`
+      INSERT INTO users (name, email, password, role, location, avatar_url, cover_url, is_verified, story_image_url, story_created_at, bio, rating, followers_count)
+      VALUES (
+        'Marrakech Desert Star', 
+        'marrakech@example.com', 
+        ?, 
+        'agency', 
+        'Marrakech, Morocco', 
+        '/logo2.jpg', 
+        '/marrakech medina.jpg', 
+        true,
+        '/marrakech medina.jpg',
+        ?,
+        'Premium guides for Marrakech medina tours and stargazing experiences in the nearby Agafay desert.',
+        5.00,
+        15100
+      )
+    `, [hashedPassword, now]);
+    const agency3Id = agency3Result.insertId;
+
+    // Seed Traveler
+    const [travelerResult] = await connection.query(`
+      INSERT INTO users (name, email, password, role, location, avatar_url)
+      VALUES (
+        'Yassine Benslimane', 
+        'traveler@example.com', 
+        ?, 
+        'traveler', 
+        'Casablanca, Morocco', 
+        '/MorP.jpg'
+      )
+    `, [hashedPassword]);
+    const travelerId = travelerResult.insertId;
+
+    // Seed Tours
+    const [tour1Result] = await connection.query(`
+      INSERT INTO tours (agency_id, title, price, location, duration, description, image_url, included, not_included, tags, is_boosted)
+      VALUES (
+        ?, 
+        '3-Day Sahara Desert Luxury Expedition', 
+        299.00, 
+        'Merzouga Dunes', 
+        '3 Days, 2 Nights', 
+        'Experience the magic of the Sahara. Ride camels over golden dunes, sleep under the starlit sky in a premium desert camp, and enjoy traditional Berber hospitality.', 
+        '/Sahara Desert Adventure.jpg', 
+        ?, 
+        ?, 
+        ?,
+        true
+      )
+    `, [
+      agency1Id,
+      JSON.stringify(['Camel ride guide', 'Luxury camp lodging', 'All dinners & breakfasts', 'A/C Transport']),
+      JSON.stringify(['Lunch meals', 'Tips & gratuities', 'Personal souvenirs']),
+      JSON.stringify(['Adventure', 'Sahara', 'Luxury', 'Desert'])
+    ]);
+    const tour1Id = tour1Result.insertId;
+
+    const [tour2Result] = await connection.query(`
+      INSERT INTO tours (agency_id, title, price, location, duration, description, image_url, included, not_included, tags, is_boosted)
+      VALUES (
+        ?, 
+        'Chefchaouen Blue City Guided Day Trip', 
+        49.00, 
+        'Chefchaouen', 
+        '1 Day', 
+        'Wander the breathtaking blue-washed alleys of Chefchaouen. Discover the rich history of the Rif Mountains, shop local artisanal crafts, and capture unforgettable photos.', 
+        '/Chefchaouen-tours.jpg', 
+        ?, 
+        ?, 
+        ?,
+        false
+      )
+    `, [
+      agency2Id,
+      JSON.stringify(['Professional local guide', 'Comfortable roundtrip transport', 'Mineral water']),
+      JSON.stringify(['Lunch & snacks', 'Museum entry tickets']),
+      JSON.stringify(['Cultural', 'Blue City', 'Day Trip'])
+    ]);
+    const tour2Id = tour2Result.insertId;
+
+    const [tour3Result] = await connection.query(`
+      INSERT INTO tours (agency_id, title, price, location, duration, description, image_url, included, not_included, tags, is_boosted)
+      VALUES (
+        ?, 
+        'Marrakech Medina Secret Souks', 
+        39.00, 
+        'Marrakech Medina', 
+        '1 Day', 
+        'Navigate the vibrant, labyrinthine souks of Marrakech with a certified local guide. Find authentic crafts, spices, and carpets while learning history.', 
+        '/marrakech medina.jpg', 
+        ?, 
+        ?, 
+        ?,
+        false
+      )
+    `, [
+      agency3Id,
+      JSON.stringify(['Certified local guide', 'Moroccan tea tasting']),
+      JSON.stringify(['Shopping costs', 'Tips']),
+      JSON.stringify(['City', 'Shopping'])
+    ]);
+    const tour3Id = tour3Result.insertId;
+
+    // Seed Community Posts
+    const [post1Result] = await connection.query(`
+      INSERT INTO posts (agency_id, location, image_url, content, has_offer, offer_link_id)
+      VALUES (
+        ?, 
+        'Merzouga, Morocco', 
+        '/sahara-desert-maroc-marrocain-8.webp', 
+        'Sunrise over the dunes is something you have to experience at least once in your life. Book our luxury desert camp expedition this weekend and receive a 10% early-bird discount! 🌅🐪', 
+        true, 
+        ?
+      )
+    `, [agency1Id, tour1Id]);
+    const post1Id = post1Result.insertId;
+
+    const [post2Result] = await connection.query(`
+      INSERT INTO posts (agency_id, location, image_url, content, has_offer, offer_link_id)
+      VALUES (
+        ?, 
+        'Chefchaouen, Morocco', 
+        '/Fes.jpg', 
+        'The beautiful streets of Chefchaouen are waiting for you. Get ready for local colors, authentic spices, and amazing pictures! 📸💙', 
+        true, 
+        ?
+      )
+    `, [agency2Id, tour2Id]);
+
+    // Seed Post Likes
+    await connection.query(`
+      INSERT INTO post_likes (post_id, user_id) 
+      VALUES (?, ?)
+    `, [post1Id, travelerId]);
+
+    // Seed Post Comments
+    await connection.query(`
+      INSERT INTO post_comments (post_id, user_id, text)
+      VALUES (?, ?, 'This looks absolutely stunning! Definitely booking this for my summer holidays.')
+    `, [post1Id, travelerId]);
+
+    // Seed User Follows
+    await connection.query(`
+      INSERT INTO user_follows (follower_id, agency_id)
+      VALUES (?, ?)
+    `, [travelerId, agency1Id]);
+
+    // Seed User Wishlist
+    await connection.query(`
+      INSERT INTO user_wishlist (user_id, tour_id)
+      VALUES (?, ?)
+    `, [travelerId, tour2Id]);
+
+    // Seed Booking (WhatsApp Lead)
+    await connection.query(`
+      INSERT INTO bookings (traveler_id, agency_id, tour_id, traveler_phone, status)
+      VALUES (?, ?, ?, '+212612345678', 'New')
+    `, [travelerId, agency1Id, tour1Id]);
+
+    // Seed Chat Thread & Messages
+    const [chatResult] = await connection.query(`
+      INSERT INTO chats (traveler_id, agency_id)
+      VALUES (?, ?)
+    `, [travelerId, agency1Id]);
+    const chatId = chatResult.insertId;
+
+    await connection.query(`
+      INSERT INTO messages (chat_id, sender_id, message_text)
+      VALUES (?, ?, 'Salam! I have a question about the 3-Day Sahara Expedition. Are warm clothes needed for the night camp?')
+    `, [chatId, travelerId]);
+
+    await connection.query(`
+      INSERT INTO messages (chat_id, sender_id, message_text)
+      VALUES (?, ?, 'Wa alaykum salam! Yes, the desert temperature drops significantly after sunset, so we highly recommend bringing a warm jacket.')
+    `, [chatId, agency1Id]);
+
+    console.log('🌱 Database seeded successfully.');
+    console.log('🎉 Database initialization complete!');
+  } catch (error) {
+    console.error('❌ Error initializing database:', error);
+    process.exit(1);
+  } finally {
+    if (connection) connection.release();
+    // Close the pool to allow process to terminate cleanly
+    await pool.end();
+  }
+};
+
+initDb();
