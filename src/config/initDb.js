@@ -20,6 +20,7 @@ const initDb = async () => {
     await connection.query('DROP TABLE IF EXISTS post_comments');
     await connection.query('DROP TABLE IF EXISTS post_likes');
     await connection.query('DROP TABLE IF EXISTS posts');
+    await connection.query('DROP TABLE IF EXISTS stories');
     await connection.query('DROP TABLE IF EXISTS tours');
     await connection.query('DROP TABLE IF EXISTS users');
 
@@ -37,6 +38,7 @@ const initDb = async () => {
         is_verified BOOLEAN DEFAULT FALSE,
         story_image_url VARCHAR(500),
         story_created_at TIMESTAMP NULL DEFAULT NULL,
+        story_views_count INT DEFAULT 0,
         bio VARCHAR(1000) DEFAULT NULL,
         rating DECIMAL(3, 2) DEFAULT 5.00,
         followers_count INT DEFAULT 0,
@@ -44,6 +46,19 @@ const initDb = async () => {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
     `);
     console.log('✅ "users" table verified.');
+
+    // 1b. Stories Table
+    await connection.query(`
+      CREATE TABLE IF NOT EXISTS stories (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        agency_id INT NOT NULL,
+        image_url VARCHAR(500) NOT NULL,
+        views_count INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_stories_agency FOREIGN KEY (agency_id) REFERENCES users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+    `);
+    console.log('✅ "stories" table verified.');
 
     // 2. Tours Table
     await connection.query(`
@@ -121,6 +136,7 @@ const initDb = async () => {
         agency_id INT NOT NULL,
         tour_id INT NOT NULL,
         traveler_phone VARCHAR(50) NOT NULL,
+        guests_count INT DEFAULT 1,
         status ENUM('New', 'Contacted', 'Booked', 'Cancelled') DEFAULT 'New',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT fk_bookings_traveler FOREIGN KEY (traveler_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -195,7 +211,7 @@ const initDb = async () => {
 
     // Seed Agency 1 (Atlas Nomads Travel)
     const [agency1Result] = await connection.query(`
-      INSERT INTO users (name, email, password, role, location, avatar_url, cover_url, is_verified, story_image_url, story_created_at, bio, rating, followers_count)
+      INSERT INTO users (name, email, password, role, location, avatar_url, cover_url, is_verified, story_image_url, story_created_at, story_views_count, bio, rating, followers_count)
       VALUES (
         'Atlas Nomads Travel', 
         'agency@example.com', 
@@ -207,6 +223,7 @@ const initDb = async () => {
         true,
         '/sahara-desert-maroc-marrocain-8.webp',
         ?,
+        245,
         'Leading local guide agency in Merzouga specializing in luxury desert tours and camel expeditions.',
         4.90,
         12400
@@ -216,7 +233,7 @@ const initDb = async () => {
 
     // Seed Agency 2 (BlueCity Guides)
     const [agency2Result] = await connection.query(`
-      INSERT INTO users (name, email, password, role, location, avatar_url, cover_url, is_verified, story_image_url, story_created_at, bio, rating, followers_count)
+      INSERT INTO users (name, email, password, role, location, avatar_url, cover_url, is_verified, story_image_url, story_created_at, story_views_count, bio, rating, followers_count)
       VALUES (
         'BlueCity Guides', 
         'bluecity@example.com', 
@@ -228,6 +245,7 @@ const initDb = async () => {
         true,
         '/Chefchaouen-tours.jpg',
         ?,
+        180,
         'Authentic cultural tours of the blue city of Chefchaouen and day hikes into the Rif Mountains.',
         4.80,
         8900
@@ -237,7 +255,7 @@ const initDb = async () => {
 
     // Seed Agency 3 (Marrakech Desert Star)
     const [agency3Result] = await connection.query(`
-      INSERT INTO users (name, email, password, role, location, avatar_url, cover_url, is_verified, story_image_url, story_created_at, bio, rating, followers_count)
+      INSERT INTO users (name, email, password, role, location, avatar_url, cover_url, is_verified, story_image_url, story_created_at, story_views_count, bio, rating, followers_count)
       VALUES (
         'Marrakech Desert Star', 
         'marrakech@example.com', 
@@ -249,12 +267,18 @@ const initDb = async () => {
         true,
         '/marrakech medina.jpg',
         ?,
+        310,
         'Premium guides for Marrakech medina tours and stargazing experiences in the nearby Agafay desert.',
         5.00,
         15100
       )
     `, [hashedPassword, now]);
     const agency3Id = agency3Result.insertId;
+
+    // Seed initial rows into stories table
+    await connection.query("INSERT INTO stories (agency_id, image_url, views_count, created_at) VALUES (?, '/sahara-desert-maroc-marrocain-8.webp', 245, ?)", [agency1Id, now]);
+    await connection.query("INSERT INTO stories (agency_id, image_url, views_count, created_at) VALUES (?, '/Chefchaouen-tours.jpg', 180, ?)", [agency2Id, now]);
+    await connection.query("INSERT INTO stories (agency_id, image_url, views_count, created_at) VALUES (?, '/marrakech medina.jpg', 310, ?)", [agency3Id, now]);
 
     // Seed Traveler
     const [travelerResult] = await connection.query(`
@@ -392,8 +416,8 @@ const initDb = async () => {
 
     // Seed Booking (WhatsApp Lead)
     await connection.query(`
-      INSERT INTO bookings (traveler_id, agency_id, tour_id, traveler_phone, status)
-      VALUES (?, ?, ?, '+212612345678', 'New')
+      INSERT INTO bookings (traveler_id, agency_id, tour_id, traveler_phone, guests_count, status)
+      VALUES (?, ?, ?, '+212612345678', 2, 'New')
     `, [travelerId, agency1Id, tour1Id]);
 
     // Seed Chat Thread & Messages

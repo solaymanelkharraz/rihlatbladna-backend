@@ -3,11 +3,19 @@ import {
   getAllAgencies, 
   getAgencyById, 
   toggleFollowAgency, 
-  postStory 
+  postStory,
+  getMyStories,
+  deleteStory,
+  incrementStoryViews
 } from '../controllers/agencyController.js';
 import { protect, restrictTo } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
+
+// Specific routes before parameterized routes
+router.get('/stories/my', protect, restrictTo('agency'), getMyStories);
+router.delete('/stories/:id', protect, restrictTo('agency'), deleteStory);
+router.post('/:agencyId/story/view', incrementStoryViews);
 
 // Public routes
 router.get('/', getAllAgencies);

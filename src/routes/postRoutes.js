@@ -4,7 +4,9 @@ import {
   createPost, 
   toggleLikePost, 
   addCommentToPost, 
-  deletePost 
+  deletePost,
+  updatePost,
+  deleteComment
 } from '../controllers/postController.js';
 import { protect, restrictTo } from '../middleware/authMiddleware.js';
 
@@ -15,10 +17,12 @@ router.get('/', getAllPosts);
 
 // Protected routes
 router.post('/', protect, restrictTo('agency'), createPost);
+router.put('/:id', protect, restrictTo('agency', 'admin'), updatePost);
 router.delete('/:id', protect, restrictTo('agency', 'admin'), deletePost);
 
 // Interaction routes (any logged in user)
 router.post('/:id/like', protect, toggleLikePost);
 router.post('/:id/comment', protect, addCommentToPost);
+router.delete('/:postId/comments/:commentId', protect, deleteComment);
 
 export default router;

@@ -7,6 +7,7 @@ export const mapBookingResponse = (dbBooking) => {
     travelerId: dbBooking.traveler_id,
     travelerName: dbBooking.traveler_name || 'Traveler Name',
     travelerPhone: dbBooking.traveler_phone,
+    guestsCount: parseInt(dbBooking.guests_count || 1, 10),
     agencyId: dbBooking.agency_id,
     agencyName: dbBooking.agency_name || 'Agency Name',
     tourId: dbBooking.tour_id,
@@ -22,8 +23,9 @@ export const mapBookingResponse = (dbBooking) => {
  * @access Private (Traveler only)
  */
 export const createBooking = async (req, res) => {
-  const { tourId, travelerPhone } = req.body;
+  const { tourId, travelerPhone, guestsCount } = req.body;
   const travelerId = req.user.id;
+  const seats = parseInt(guestsCount || 1, 10);
 
   try {
     if (!tourId || !travelerPhone) {
@@ -38,11 +40,11 @@ export const createBooking = async (req, res) => {
     const tour = tourRows[0];
     const agencyId = tour.agency_id;
 
-    // 2. Insert Booking entry
+    // 2. Insert Booking entry with guests_count
     const [bookingResult] = await pool.query(`
-      INSERT INTO bookings (traveler_id, agency_id, tour_id, traveler_phone, status)
-      VALUES (?, ?, ?, ?, 'New')
-    `, [travelerId, agencyId, tourId, travelerPhone]);
+      INSERT INTO bookings (traveler_id, agency_id, tour_id, traveler_phone, guests_count, status)
+      VALUES (?, ?, ?, ?, ?, 'New')
+    `, [travelerId, agencyId, tourId, travelerPhone, seats]);
 
     // 3. Initiate or find Chat Thread between traveler and agency
     let chatId;
@@ -61,16 +63,22 @@ export const createBooking = async (req, res) => {
       chatId = chatResult.insertId;
     }
 
-    // 4. Insert an inquiry notification message from traveler in chat
-    const inquiryMessageText = `Inquiry sent for tour: "${tour.title}". Phone provided: ${travelerPhone}`;
+    // 4. Insert TWO structured automated confirmation messages in the chat
+    const inquiryMessageText = `📅 New Reservation Placed: ${seats} Seat(s) for "${tour.title}". Traveler Contact Phone: ${travelerPhone}. Status: Pending Confirmation.`;
     await pool.query(
       'INSERT INTO messages (chat_id, sender_id, message_text) VALUES (?, ?, ?)',
       [chatId, travelerId, inquiryMessageText]
     );
 
+    const automatedReplyText = `✅ Salam! We saw your booking for ${seats} seat(s) on "${tour.title}". Your reservation has been logged and sent to the agency team! We are checking our availability schedule right now and will send you a confirmation message via WhatsApp (${travelerPhone}) shortly.`;
+    await pool.query(
+      'INSERT INTO messages (chat_id, sender_id, message_text) VALUES (?, ?, ?)',
+      [chatId, agencyId, automatedReplyText]
+    );
+
     return res.status(201).json({
       success: true,
-      message: 'Booking inquiry logged successfully',
+      message: 'Booking reservation created successfully',
       bookingId: bookingResult.insertId,
       threadId: chatId
     });

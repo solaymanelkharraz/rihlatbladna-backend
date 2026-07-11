@@ -265,3 +265,133 @@ export const deletePost = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Server error deleting post' });
   }
 };
+
+/**
+ * Update a community post
+ * @route PUT /api/posts/:id
+ * @access Private (Agency owner/Admin only)
+ */
+export const updatePost = async (req, res) => {
+  const { id } = req.params;
+  const { content, image, offerLinkId } = req.body;
+  const agencyId = req.user.id;
+
+  try {
+    const [existing] = await pool.query('SELECT agency_id FROM posts WHERE id = ?', [id]);
+    if (existing.length === 0) {
+      return res.status(404).json({ success: false, message: 'Post not found' });
+    }
+
+    if (existing[0].agency_id !== agencyId && req.user.role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'You do not have permission to edit this post' });
+    }
+
+    // Build fields dynamically
+    const fields = [];
+    const values = [];
+
+    if (content !== undefined) {
+      if (!content.trim()) {
+        return res.status(400).json({ success: false, message: 'Post content cannot be empty' });
+      }
+      fields.push('content = ?');
+      values.push(content.trim());
+    }
+
+    if (image !== undefined) {
+      fields.push('image_url = ?');
+      values.push(image || '/sahara-desert-maroc-marrocain-8.webp');
+    }
+
+    if (offerLinkId !== undefined) {
+      fields.push('has_offer = ?');
+      values.push(!!offerLinkId);
+      fields.push('offer_link_id = ?');
+      values.push(offerLinkId || null);
+    }
+
+    if (fields.length === 0) {
+      return res.status(400).json({ success: false, message: 'No fields to update' });
+    }
+
+    values.push(id);
+
+    await pool.query(`UPDATE posts SET ${fields.join(', ')} WHERE id = ?`, values);
+
+    // Fetch the updated post
+    const [rows] = await pool.query(`
+      SELECT p.*, u.name as agency_name, u.avatar_url as agency_avatar 
+      FROM posts p
+      JOIN users u ON p.agency_id = u.id
+      WHERE p.id = ?
+    `, [id]);
+
+    const postResponse = await mapPostResponse(rows[0]);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Post updated successfully',
+      post: postResponse
+    });
+  } catch (error) {
+    console.error('Error updating post:', error);
+    return res.status(500).json({ success: false, message: 'Server error updating post' });
+  }
+};
+
+/**
+ * Delete a comment on a post
+ * @route DELETE /api/posts/:postId/comments/:commentId
+ * @access Private
+ */
+export const deleteComment = async (req, res) => {
+  const { postId, commentId } = req.params;
+  const userId = req.user.id;
+  const role = req.user.role;
+
+  try {
+    // Check comment exists
+    const [existing] = await pool.query('SELECT * FROM post_comments WHERE id = ? AND post_id = ?', [commentId, postId]);
+    if (existing.length === 0) {
+      return res.status(404).json({ success: false, message: 'Comment not found' });
+    }
+
+    // Check if user is comment owner, post owner, or admin
+    const commentOwnerId = existing[0].user_id;
+
+    const [post] = await pool.query('SELECT agency_id FROM posts WHERE id = ?', [postId]);
+    const postOwnerId = post[0]?.agency_id;
+
+    if (userId !== commentOwnerId && userId !== postOwnerId && role !== 'admin') {
+      return res.status(403).json({ success: false, message: 'You do not have permission to delete this comment' });
+    }
+
+    await pool.query('DELETE FROM post_comments WHERE id = ?', [commentId]);
+
+    // Fetch updated comments
+    const [commentRows] = await pool.query(`
+      SELECT c.*, u.name as user_name, u.avatar_url as user_avatar 
+      FROM post_comments c
+      JOIN users u ON c.user_id = u.id
+      WHERE c.post_id = ?
+      ORDER BY c.created_at ASC
+    `, [postId]);
+
+    const comments = commentRows.map(row => ({
+      id: row.id,
+      userName: row.user_name,
+      avatar: row.user_avatar || '/MorP.jpg',
+      text: row.text,
+      createdAt: row.created_at
+    }));
+
+    return res.status(200).json({
+      success: true,
+      message: 'Comment deleted successfully',
+      comments
+    });
+  } catch (error) {
+    console.error('Error deleting comment:', error);
+    return res.status(500).json({ success: false, message: 'Server error deleting comment' });
+  }
+};

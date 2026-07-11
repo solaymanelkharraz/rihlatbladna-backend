@@ -45,6 +45,7 @@ export const mapUserResponse = async (dbUser) => {
     followersCount: parseInt(dbUser.followers_count || 0, 10),
     storyImage: dbUser.story_image_url || null,
     storyCreatedAt: dbUser.story_created_at || null,
+    storyViewsCount: parseInt(dbUser.story_views_count || 0, 10),
     savedTours,
     followingAgencies
   };
@@ -182,7 +183,9 @@ export const getMe = async (req, res) => {
  * @access Private
  */
 export const updateProfile = async (req, res) => {
-  const { name, location, avatar, cover, bio } = req.body;
+  const { name, location, bio } = req.body;
+  const avatar = req.body.avatar !== undefined ? req.body.avatar : req.body.avatarUrl;
+  const cover = req.body.cover !== undefined ? req.body.cover : req.body.coverUrl;
 
   try {
     const userId = req.user.id;
@@ -191,10 +194,10 @@ export const updateProfile = async (req, res) => {
     const fields = [];
     const values = [];
 
-    if (name) { fields.push('name = ?'); values.push(name); }
-    if (location) { fields.push('location = ?'); values.push(location); }
-    if (avatar) { fields.push('avatar_url = ?'); values.push(avatar); }
-    if (cover) { fields.push('cover_url = ?'); values.push(cover); }
+    if (name !== undefined) { fields.push('name = ?'); values.push(name); }
+    if (location !== undefined) { fields.push('location = ?'); values.push(location); }
+    if (avatar !== undefined) { fields.push('avatar_url = ?'); values.push(avatar); }
+    if (cover !== undefined) { fields.push('cover_url = ?'); values.push(cover); }
     if (bio !== undefined) { fields.push('bio = ?'); values.push(bio); }
 
     if (fields.length === 0) {
