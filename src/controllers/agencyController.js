@@ -141,7 +141,7 @@ export const toggleFollowAgency = async (req, res) => {
  * @access Private (Agency only)
  */
 export const postStory = async (req, res) => {
-  const { storyImage } = req.body;
+  const storyImage = req.body.storyImage || req.body.image;
   const agencyId = req.user.id;
 
   try {
