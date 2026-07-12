@@ -212,73 +212,84 @@ const initDb = async () => {
     // Seed Agency 1 (Atlas Nomads Travel)
     const [agency1Result] = await connection.query(`
       INSERT INTO users (name, email, password, role, location, avatar_url, cover_url, is_verified, story_image_url, story_created_at, story_views_count, bio, rating, followers_count)
-      VALUES (
-        'Atlas Nomads Travel', 
-        'agency@example.com', 
-        ?, 
-        'agency', 
-        'Merzouga, Morocco', 
-        '/agency2.jpg.jpg', 
-        '/morocco1.jpg', 
-        true,
-        '/sahara-desert-maroc-marrocain-8.webp',
-        ?,
-        245,
-        'Leading local guide agency in Merzouga specializing in luxury desert tours and camel expeditions.',
-        4.90,
-        12400
-      )
+      VALUES ('Atlas Nomads Travel', 'agency@example.com', ?, 'agency', 'Merzouga, Morocco', '/agency2.jpg.jpg', '/morocco1.jpg', true, '/sahara-desert-maroc-marrocain-8.webp', ?, 545, 'Leading local guide agency in Merzouga specializing in luxury desert tours and camel expeditions.', 4.90, 15400)
     `, [hashedPassword, now]);
     const agency1Id = agency1Result.insertId;
 
     // Seed Agency 2 (BlueCity Guides)
     const [agency2Result] = await connection.query(`
       INSERT INTO users (name, email, password, role, location, avatar_url, cover_url, is_verified, story_image_url, story_created_at, story_views_count, bio, rating, followers_count)
-      VALUES (
-        'BlueCity Guides', 
-        'bluecity@example.com', 
-        ?, 
-        'agency', 
-        'Chefchaouen, Morocco', 
-        '/MorP.jpg', 
-        '/Fes.jpg', 
-        true,
-        '/Chefchaouen-tours.jpg',
-        ?,
-        180,
-        'Authentic cultural tours of the blue city of Chefchaouen and day hikes into the Rif Mountains.',
-        4.80,
-        8900
-      )
+      VALUES ('BlueCity Guides', 'bluecity@example.com', ?, 'agency', 'Chefchaouen, Morocco', '/Morocco.jpg', '/Fes.jpg', true, '/Chefchaouen-tours.jpg', ?, 480, 'Authentic cultural tours of the blue city of Chefchaouen and day hikes into the Rif Mountains.', 4.80, 14200)
     `, [hashedPassword, now]);
     const agency2Id = agency2Result.insertId;
 
     // Seed Agency 3 (Marrakech Desert Star)
     const [agency3Result] = await connection.query(`
       INSERT INTO users (name, email, password, role, location, avatar_url, cover_url, is_verified, story_image_url, story_created_at, story_views_count, bio, rating, followers_count)
-      VALUES (
-        'Marrakech Desert Star', 
-        'marrakech@example.com', 
-        ?, 
-        'agency', 
-        'Marrakech, Morocco', 
-        '/logo2.jpg', 
-        '/marrakech medina.jpg', 
-        true,
-        '/marrakech medina.jpg',
-        ?,
-        310,
-        'Premium guides for Marrakech medina tours and stargazing experiences in the nearby Agafay desert.',
-        5.00,
-        15100
-      )
+      VALUES ('Marrakech Desert Star', 'marrakech@example.com', ?, 'agency', 'Marrakech, Morocco', '/logo2.jpg', '/marrakech medina.jpg', true, '/marrakech medina.jpg', ?, 510, 'Premium guides for Marrakech medina tours and stargazing experiences in the nearby Agafay desert.', 5.00, 13900)
     `, [hashedPassword, now]);
     const agency3Id = agency3Result.insertId;
 
-    // Seed initial rows into stories table
-    await connection.query("INSERT INTO stories (agency_id, image_url, views_count, created_at) VALUES (?, '/sahara-desert-maroc-marrocain-8.webp', 245, ?)", [agency1Id, now]);
-    await connection.query("INSERT INTO stories (agency_id, image_url, views_count, created_at) VALUES (?, '/Chefchaouen-tours.jpg', 180, ?)", [agency2Id, now]);
-    await connection.query("INSERT INTO stories (agency_id, image_url, views_count, created_at) VALUES (?, '/marrakech medina.jpg', 310, ?)", [agency3Id, now]);
+    // Seed Agency 4 (Fes Heritage Expeditions)
+    const [agency4Result] = await connection.query(`
+      INSERT INTO users (name, email, password, role, location, avatar_url, cover_url, is_verified, story_image_url, story_created_at, story_views_count, bio, rating, followers_count)
+      VALUES ('Fes Heritage Expeditions', 'fes@example.com', ?, 'agency', 'Fes, Morocco', '/Fes.jpg', '/el-attarine-medersa-in-fez.jpg', true, '/el-attarine-medersa-in-fez.jpg', ?, 420, 'Immersive historic walks inside the world’s largest car-free urban area and royal medersas of Fes.', 4.95, 12800)
+    `, [hashedPassword, now]);
+    const agency4Id = agency4Result.insertId;
+
+    // Seed Agency 5 (Sahara Dunes Trekking)
+    const [agency5Result] = await connection.query(`
+      INSERT INTO users (name, email, password, role, location, avatar_url, cover_url, is_verified, story_image_url, story_created_at, story_views_count, bio, rating, followers_count)
+      VALUES ('Sahara Dunes Trekking', 'sahara@example.com', ?, 'agency', 'Erg Chebbi, Morocco', '/sahara.jpeg', '/Sahara Desert Adventure.jpg', true, '/Sahara Desert Adventure.jpg', ?, 390, 'Custom 4x4 desert safaris, traditional Berber bivouacs, and sunrise camel caravans across Erg Chebbi.', 4.85, 11500)
+    `, [hashedPassword, now]);
+    const agency5Id = agency5Result.insertId;
+
+    // Seed Agency 6 (Essaouira Coastal Riders)
+    const [agency6Result] = await connection.query(`
+      INSERT INTO users (name, email, password, role, location, avatar_url, cover_url, is_verified, story_image_url, story_created_at, story_views_count, bio, rating, followers_count)
+      VALUES ('Essaouira Coastal Riders', 'essaouira@example.com', ?, 'agency', 'Essaouira, Morocco', '/MorP.jpg', '/morocco1.jpg', true, '/morocco1.jpg', ?, 340, 'Kitesurfing lessons, Atlantic wind excursions, and rampart sunset walks along Mogador’s breezy coast.', 4.75, 10900)
+    `, [hashedPassword, now]);
+    const agency6Id = agency6Result.insertId;
+
+    // Seed Agency 7 (Toubkal Summit Guides)
+    const [agency7Result] = await connection.query(`
+      INSERT INTO users (name, email, password, role, location, avatar_url, cover_url, is_verified, story_image_url, story_created_at, story_views_count, bio, rating, followers_count)
+      VALUES ('Toubkal Summit Guides', 'toubkal@example.com', ?, 'agency', 'High Atlas Mountains', '/agency2.jpg.jpg', '/Chefchaouen-tours.jpg', true, '/Chefchaouen-tours.jpg', ?, 310, 'Certified mountain guides for Jbel Toubkal ascents, valley trekking, and Berber village homestays.', 4.90, 9800)
+    `, [hashedPassword, now]);
+    const agency7Id = agency7Result.insertId;
+
+    // Seed Agency 8 (Kasbah & Oasis Journeys)
+    const [agency8Result] = await connection.query(`
+      INSERT INTO users (name, email, password, role, location, avatar_url, cover_url, is_verified, story_image_url, story_created_at, story_views_count, bio, rating, followers_count)
+      VALUES ('Kasbah & Oasis Journeys', 'kasbah@example.com', ?, 'agency', 'Ouarzazate, Morocco', '/logo2.jpg', '/sahara-desert-maroc-marrocain-8.webp', true, '/sahara-desert-maroc-marrocain-8.webp', ?, 280, 'Cinema studios visits, Ait Benhaddou kasbah tours, and Draa Valley palm oasis expeditions.', 4.80, 8700)
+    `, [hashedPassword, now]);
+    const agency8Id = agency8Result.insertId;
+
+    // Seed Agency 9 (Tangier Gateway Tours)
+    const [agency9Result] = await connection.query(`
+      INSERT INTO users (name, email, password, role, location, avatar_url, cover_url, is_verified, story_image_url, story_created_at, story_views_count, bio, rating, followers_count)
+      VALUES ('Tangier Gateway Tours', 'tangier@example.com', ?, 'agency', 'Tangier, Morocco', '/Morocco.jpg', '/Fes.jpg', true, '/Fes.jpg', ?, 250, 'Discover where the Mediterranean meets the Atlantic, Cap Spartel, and the historic Kasbah of Tangier.', 4.70, 7900)
+    `, [hashedPassword, now]);
+    const agency9Id = agency9Result.insertId;
+
+    // Seed Agency 10 (Agafay Luxury Campings)
+    const [agency10Result] = await connection.query(`
+      INSERT INTO users (name, email, password, role, location, avatar_url, cover_url, is_verified, story_image_url, story_created_at, story_views_count, bio, rating, followers_count)
+      VALUES ('Agafay Luxury Campings', 'agafay@example.com', ?, 'agency', 'Agafay Desert, Morocco', '/Marrakesh.jpg', '/marrakech medina.jpg', true, '/marrakech medina.jpg', ?, 230, 'Eco-luxury glamping, romantic sunset dinners, and quad adventures in the rocky Agafay desert.', 4.88, 7200)
+    `, [hashedPassword, now]);
+    const agency10Id = agency10Result.insertId;
+
+    // Seed initial rows into stories table for ALL 10 agencies
+    await connection.query("INSERT INTO stories (agency_id, image_url, views_count, created_at) VALUES (?, '/sahara-desert-maroc-marrocain-8.webp', 545, ?)", [agency1Id, now]);
+    await connection.query("INSERT INTO stories (agency_id, image_url, views_count, created_at) VALUES (?, '/Chefchaouen-tours.jpg', 480, ?)", [agency2Id, now]);
+    await connection.query("INSERT INTO stories (agency_id, image_url, views_count, created_at) VALUES (?, '/marrakech medina.jpg', 510, ?)", [agency3Id, now]);
+    await connection.query("INSERT INTO stories (agency_id, image_url, views_count, created_at) VALUES (?, '/el-attarine-medersa-in-fez.jpg', 420, ?)", [agency4Id, now]);
+    await connection.query("INSERT INTO stories (agency_id, image_url, views_count, created_at) VALUES (?, '/Sahara Desert Adventure.jpg', 390, ?)", [agency5Id, now]);
+    await connection.query("INSERT INTO stories (agency_id, image_url, views_count, created_at) VALUES (?, '/morocco1.jpg', 340, ?)", [agency6Id, now]);
+    await connection.query("INSERT INTO stories (agency_id, image_url, views_count, created_at) VALUES (?, '/Chefchaouen-tours.jpg', 310, ?)", [agency7Id, now]);
+    await connection.query("INSERT INTO stories (agency_id, image_url, views_count, created_at) VALUES (?, '/sahara-desert-maroc-marrocain-8.webp', 280, ?)", [agency8Id, now]);
+    await connection.query("INSERT INTO stories (agency_id, image_url, views_count, created_at) VALUES (?, '/Fes.jpg', 250, ?)", [agency9Id, now]);
+    await connection.query("INSERT INTO stories (agency_id, image_url, views_count, created_at) VALUES (?, '/marrakech medina.jpg', 230, ?)", [agency10Id, now]);
 
     // Seed Traveler
     const [travelerResult] = await connection.query(`
@@ -363,6 +374,75 @@ const initDb = async () => {
       JSON.stringify(['City', 'Shopping'])
     ]);
     const tour3Id = tour3Result.insertId;
+
+    const [tour4Result] = await connection.query(`
+      INSERT INTO tours (agency_id, title, price, location, duration, description, image_url, included, not_included, tags, is_boosted)
+      VALUES (
+        ?, 
+        'Fes Medina & Royal Tannery Cultural Walk', 
+        45.00, 
+        'Fes Medina', 
+        '1 Day', 
+        'Immerse yourself in the UNESCO World Heritage medina of Fes. Visit historic medersas, traditional artisan workshops, and the world-renowned Chouara Tannery with an expert historian.', 
+        '/el-attarine-medersa-in-fez.jpg', 
+        ?, 
+        ?, 
+        ?,
+        true
+      )
+    `, [
+      agency4Id,
+      JSON.stringify(['Certified historian guide', 'Medersa entrance tickets', 'Mint tea']),
+      JSON.stringify(['Lunch', 'Personal souvenirs']),
+      JSON.stringify(['Cultural', 'History', 'Fes'])
+    ]);
+    const tour4Id = tour4Result.insertId;
+
+    const [tour5Result] = await connection.query(`
+      INSERT INTO tours (agency_id, title, price, location, duration, description, image_url, included, not_included, tags, is_boosted)
+      VALUES (
+        ?, 
+        'Erg Chebbi Sunset 4x4 Safari & Camp Bivouac', 
+        180.00, 
+        'Erg Chebbi', 
+        '2 Days, 1 Night', 
+        'Thrill on a 4x4 off-road safari through Erg Chebbi dunes, enjoy traditional Gnawa music, and sleep under millions of stars at a luxury Berber oasis camp.', 
+        '/Sahara Desert Adventure.jpg', 
+        ?, 
+        ?, 
+        ?,
+        true
+      )
+    `, [
+      agency5Id,
+      JSON.stringify(['4x4 Desert Safari', 'Private Berber tent', 'Dinner & breakfast', 'Camel trek']),
+      JSON.stringify(['Quad bike rental (optional)', 'Personal tips']),
+      JSON.stringify(['Adventure', 'Safari', 'Desert'])
+    ]);
+    const tour5Id = tour5Result.insertId;
+
+    const [tour6Result] = await connection.query(`
+      INSERT INTO tours (agency_id, title, price, location, duration, description, image_url, included, not_included, tags, is_boosted)
+      VALUES (
+        ?, 
+        'Essaouira Atlantic Surf & Kite Experience', 
+        110.00, 
+        'Essaouira Coast', 
+        '2 Days', 
+        'Feel the Atlantic breeze on Essaouira coast. Includes professional kite/surf coaching, full wetsuit gear, and sunset walks along the UNESCO historic ramparts.', 
+        '/morocco1.jpg', 
+        ?, 
+        ?, 
+        ?,
+        false
+      )
+    `, [
+      agency6Id,
+      JSON.stringify(['Professional surf instruction', 'Full gear & wetsuit rental', 'Beach snacks']),
+      JSON.stringify(['Hotel accommodation', 'Dinners']),
+      JSON.stringify(['Surfing', 'Coastal', 'Sports'])
+    ]);
+    const tour6Id = tour6Result.insertId;
 
     // Seed Community Posts
     const [post1Result] = await connection.query(`
