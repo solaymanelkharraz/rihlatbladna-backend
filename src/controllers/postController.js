@@ -24,13 +24,21 @@ export const mapPostResponse = async (dbPost) => {
       ORDER BY c.created_at ASC
     `, [postId]);
 
-    comments = commentRows.map(row => ({
-      id: row.id,
-      userName: row.user_name,
-      avatar: row.user_avatar || `https://i.pravatar.cc/150?u=${encodeURIComponent(row.user_name)}`,
-      text: row.text,
-      createdAt: row.created_at
-    }));
+    comments = commentRows.map(row => {
+      let cAvatar = row.user_avatar;
+      if (Buffer.isBuffer(cAvatar)) cAvatar = cAvatar.toString('utf8');
+      cAvatar = cAvatar || '/MorP.jpg';
+      if (typeof cAvatar === 'string' && cAvatar.startsWith('data:image') && (cAvatar.length <= 500 || !cAvatar.includes('base64,'))) {
+        cAvatar = '/MorP.jpg';
+      }
+      return {
+        id: row.id,
+        userName: row.user_name,
+        avatar: cAvatar,
+        text: row.text,
+        createdAt: row.created_at
+      };
+    });
   } catch (err) {
     console.error('Error fetching post comments:', err);
   }
@@ -52,14 +60,29 @@ export const mapPostResponse = async (dbPost) => {
     return "just now";
   };
 
+  let cleanAgencyAvatar = dbPost.agency_avatar;
+  if (Buffer.isBuffer(cleanAgencyAvatar)) cleanAgencyAvatar = cleanAgencyAvatar.toString('utf8');
+  cleanAgencyAvatar = cleanAgencyAvatar || '/agency2.jpg.jpg';
+  if (typeof cleanAgencyAvatar === 'string' && cleanAgencyAvatar.startsWith('data:image') && (cleanAgencyAvatar.length <= 500 || !cleanAgencyAvatar.includes('base64,'))) {
+    cleanAgencyAvatar = '/agency2.jpg.jpg';
+  }
+
+  let cleanImage = dbPost.image_url;
+  if (Buffer.isBuffer(cleanImage)) cleanImage = cleanImage.toString('utf8');
+  cleanImage = cleanImage || null;
+  if (typeof cleanImage === 'string' && cleanImage.startsWith('data:image') && (cleanImage.length <= 500 || !cleanImage.includes('base64,'))) {
+    cleanImage = null;
+  }
+
   return {
     id: dbPost.id,
     agencyId: dbPost.agency_id,
     agencyName: dbPost.agency_name || 'Atlas Nomads Travel',
-    avatar: dbPost.agency_avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?q=80&w=150',
+    agencyRole: dbPost.agency_role || 'agency',
+    avatar: cleanAgencyAvatar,
     time: timeDiffString(dbPost.created_at),
     location: dbPost.location || 'Morocco',
-    image: dbPost.image_url,
+    image: cleanImage,
     content: dbPost.content,
     likes,
     comments,
@@ -77,7 +100,7 @@ export const mapPostResponse = async (dbPost) => {
 export const getAllPosts = async (req, res) => {
   try {
     const [rows] = await pool.query(`
-      SELECT p.*, u.name as agency_name, u.avatar_url as agency_avatar 
+      SELECT p.*, u.name as agency_name, u.avatar_url as agency_avatar, u.role as agency_role
       FROM posts p
       JOIN users u ON p.agency_id = u.id
       ORDER BY p.created_at DESC
@@ -122,7 +145,7 @@ export const createPost = async (req, res) => {
 
     // Fetch the new post
     const [rows] = await pool.query(`
-      SELECT p.*, u.name as agency_name, u.avatar_url as agency_avatar 
+      SELECT p.*, u.name as agency_name, u.avatar_url as agency_avatar, u.role as agency_role
       FROM posts p
       JOIN users u ON p.agency_id = u.id
       WHERE p.id = ?

@@ -24,6 +24,13 @@ export const mapTourResponse = (dbTour) => {
     tags = [];
   }
 
+  let cleanAvatar = dbTour.agency_avatar;
+  if (Buffer.isBuffer(cleanAvatar)) cleanAvatar = cleanAvatar.toString('utf8');
+  cleanAvatar = cleanAvatar || '/MorP.jpg';
+  if (typeof cleanAvatar === 'string' && cleanAvatar.startsWith('data:image') && (cleanAvatar.length <= 500 || !cleanAvatar.includes('base64,'))) {
+    cleanAvatar = '/MorP.jpg';
+  }
+
   return {
     id: dbTour.id,
     title: dbTour.title,
@@ -41,7 +48,7 @@ export const mapTourResponse = (dbTour) => {
     reviews: parseInt(dbTour.reviews_count || 0, 10),
     agencyId: dbTour.agency_id,
     agencyName: dbTour.agency_name || 'Atlas Nomads Travel',
-    agencyAvatar: dbTour.agency_avatar || '/MorP.jpg',
+    agencyAvatar: cleanAvatar,
     isBoosted: !!dbTour.is_boosted,
     createdAt: dbTour.created_at
   };
@@ -336,22 +343,51 @@ export const toggleBoostTour = async (req, res) => {
   const { id } = req.params;
   const agencyId = req.user.id;
 
+  let connection;
+
   try {
+    connection = await pool.getConnection();
+    await connection.beginTransaction();
+
     // Check if tour exists and check ownership
-    const [existing] = await pool.query('SELECT agency_id, is_boosted FROM tours WHERE id = ?', [id]);
+    const [existing] = await connection.query('SELECT agency_id, is_boosted FROM tours WHERE id = ? FOR UPDATE', [id]);
     if (existing.length === 0) {
+      await connection.rollback();
       return res.status(404).json({ success: false, message: 'Tour experience not found' });
     }
 
     if (existing[0].agency_id !== agencyId && req.user.role !== 'admin') {
+      await connection.rollback();
       return res.status(403).json({ success: false, message: 'You do not have permission to boost this tour' });
     }
 
-    const newBoostStatus = !existing[0].is_boosted;
+    if (existing[0].is_boosted) {
+      await connection.rollback();
+      return res.status(400).json({ success: false, message: 'Tour is already boosted' });
+    }
 
-    await pool.query('UPDATE tours SET is_boosted = ? WHERE id = ?', [newBoostStatus, id]);
+    // Check user credits
+    const [userRows] = await connection.query('SELECT credits FROM users WHERE id = ? FOR UPDATE', [agencyId]);
+    if (userRows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
 
-    // Fetch the updated tour
+    const credits = userRows[0].credits;
+    if (credits < 50) {
+      await connection.rollback();
+      return res.status(400).json({ success: false, message: 'Insufficient credits. Please top up your wallet.' });
+    }
+
+    // Deduct credits
+    await connection.query('UPDATE users SET credits = credits - 50 WHERE id = ?', [agencyId]);
+
+    // Update tour status
+    await connection.query('UPDATE tours SET is_boosted = true, boosted_until = DATE_ADD(NOW(), INTERVAL 7 DAY) WHERE id = ?', [id]);
+
+    await connection.commit();
+
+    // Fetch the updated tour to return
     const [rows] = await pool.query(`
       SELECT t.*, u.name as agency_name, u.avatar_url as agency_avatar 
       FROM tours t
@@ -361,11 +397,18 @@ export const toggleBoostTour = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: newBoostStatus ? 'Tour boosted successfully! 🚀' : 'Tour unboosted successfully.',
+      message: 'Tour boosted successfully! 🚀 50 credits deducted.',
       tour: mapTourResponse(rows[0])
     });
   } catch (error) {
+    if (connection) {
+      await connection.rollback();
+    }
     console.error('Error toggling tour boost:', error);
     return res.status(500).json({ success: false, message: 'Server error toggling tour boost' });
+  } finally {
+    if (connection) {
+      connection.release();
+    }
   }
 };

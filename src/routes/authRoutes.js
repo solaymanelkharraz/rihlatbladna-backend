@@ -1,5 +1,5 @@
 import express from 'express';
-import { register, login, getMe, updateProfile, getAllUsers, deleteUser } from '../controllers/authController.js';
+import { register, login, getMe, updateProfile, getAllUsers, deleteUser, verifyAgency } from '../controllers/authController.js';
 import { protect, restrictTo } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -15,5 +15,6 @@ router.put('/profile', protect, updateProfile);
 // Admin routes
 router.get('/users', protect, restrictTo('admin'), getAllUsers);
 router.delete('/users/:id', protect, restrictTo('admin'), deleteUser);
+router.put('/verify-agency/:id', protect, restrictTo('admin'), verifyAgency);
 
 export default router;

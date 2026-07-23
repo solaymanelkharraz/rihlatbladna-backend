@@ -12,9 +12,11 @@ const pool = mysql.createPool({
   port: parseInt(process.env.DB_PORT || '3306', 10),
   waitForConnections: true,
   connectionLimit: 10,
+  maxIdle: 10,
+  idleTimeout: 60000, // idle connections timeout after 60 seconds and are recreated when needed
   queueLimit: 0,
   enableKeepAlive: true,
-  keepAliveInitialDelay: 0
+  keepAliveInitialDelay: 10000
 });
 
 // Helper function to test db connection on startup

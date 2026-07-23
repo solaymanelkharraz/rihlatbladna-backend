@@ -8,6 +8,7 @@ import postRoutes from './routes/postRoutes.js';
 import bookingRoutes from './routes/bookingRoutes.js';
 import chatRoutes from './routes/chatRoutes.js';
 import uploadRoutes from './routes/uploadRoutes.js';
+import walletRoutes from './routes/walletRoutes.js';
 import { testConnection } from './config/db.js';
 
 // Load environment variables
@@ -46,6 +47,7 @@ app.use('/api/posts', postRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/chats', chatRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/wallet', walletRoutes);
 
 // Global Error Handler Middleware
 app.use((err, req, res, next) => {

@@ -8,7 +8,7 @@ import {
   updatePost,
   deleteComment
 } from '../controllers/postController.js';
-import { protect, restrictTo } from '../middleware/authMiddleware.js';
+import { protect, restrictTo, requireVerification } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
@@ -16,8 +16,8 @@ const router = express.Router();
 router.get('/', getAllPosts);
 
 // Protected routes
-router.post('/', protect, restrictTo('agency'), createPost);
-router.put('/:id', protect, restrictTo('agency', 'admin'), updatePost);
+router.post('/', protect, restrictTo('agency', 'admin'), requireVerification, createPost);
+router.put('/:id', protect, restrictTo('agency', 'admin'), requireVerification, updatePost);
 router.delete('/:id', protect, restrictTo('agency', 'admin'), deletePost);
 
 // Interaction routes (any logged in user)

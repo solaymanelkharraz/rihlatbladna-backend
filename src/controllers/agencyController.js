@@ -10,13 +10,53 @@ import { mapPostResponse } from './postController.js'; // We will define this he
  */
 export const getAllAgencies = async (req, res) => {
   try {
-    const [rows] = await pool.query("SELECT * FROM users WHERE role = 'agency' ORDER BY followers_count DESC");
+    const [rows] = await pool.query("SELECT * FROM users WHERE role IN ('agency', 'admin') ORDER BY followers_count DESC");
     
     const agencies = await Promise.all(rows.map(async (row) => {
       return await mapUserResponse(row);
     }));
 
-    return res.status(200).json(agencies);
+    // Fetch active stories (only from the last 24 hours)
+    const [allStories] = await pool.query("SELECT id, agency_id, image_url, views_count, created_at FROM stories WHERE created_at >= NOW() - INTERVAL 24 HOUR ORDER BY created_at ASC");
+
+    // Group stories by agencyId
+    const storiesByAgency = {};
+    allStories.forEach(s => {
+      if (!storiesByAgency[s.agency_id]) {
+        storiesByAgency[s.agency_id] = [];
+      }
+      storiesByAgency[s.agency_id].push({
+        id: s.id,
+        agencyId: s.agency_id,
+        imageUrl: s.image_url,
+        viewsCount: parseInt(s.views_count || 0, 10),
+        createdAt: s.created_at
+      });
+    });
+
+    // Attach stories to agencies
+    const agenciesWithStories = agencies.map(agency => {
+      let agencyStories = storiesByAgency[agency.id] || [];
+      if (agencyStories.length === 0 && agency.storyImage) {
+        // Fallback for pre-migration (only if the fallback is also within 24 hours)
+        const diffHours = Math.floor((new Date() - new Date(agency.storyCreatedAt || new Date())) / (1000 * 60 * 60));
+        if (diffHours < 24) {
+          agencyStories = [{
+            id: 'active',
+            agencyId: agency.id,
+            imageUrl: agency.storyImage,
+            viewsCount: parseInt(agency.storyViewsCount || 0, 10),
+            createdAt: agency.storyCreatedAt || new Date()
+          }];
+        }
+      }
+      return {
+        ...agency,
+        stories: agencyStories
+      };
+    });
+
+    return res.status(200).json(agenciesWithStories);
   } catch (error) {
     console.error('Error fetching agencies:', error);
     return res.status(500).json({ success: false, message: 'Server error fetching agencies' });
@@ -51,7 +91,7 @@ export const getAgencyById = async (req, res) => {
 
     // Fetch posts
     const [postRows] = await pool.query(`
-      SELECT p.*, u.name as agency_name, u.avatar_url as agency_avatar 
+      SELECT p.*, u.name as agency_name, u.avatar_url as agency_avatar, u.role as agency_role 
       FROM posts p
       JOIN users u ON p.agency_id = u.id
       WHERE p.agency_id = ?
@@ -61,8 +101,8 @@ export const getAgencyById = async (req, res) => {
       return await mapPostResponse(row);
     }));
 
-    // Fetch active stories for agency
-    const [storyRows] = await pool.query("SELECT * FROM stories WHERE agency_id = ? ORDER BY created_at DESC", [id]);
+    // Fetch active stories for agency (last 24 hours)
+    const [storyRows] = await pool.query("SELECT * FROM stories WHERE agency_id = ? AND created_at >= NOW() - INTERVAL 24 HOUR ORDER BY created_at DESC", [id]);
     const stories = storyRows.map(s => ({
       id: s.id,
       agencyId: s.agency_id,

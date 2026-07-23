@@ -31,23 +31,49 @@ export const mapUserResponse = async (dbUser) => {
     console.error('Error fetching user follows:', err);
   }
 
+  let cleanAvatar = dbUser.avatar_url;
+  if (Buffer.isBuffer(cleanAvatar)) cleanAvatar = cleanAvatar.toString('utf8');
+  cleanAvatar = cleanAvatar || '/MorP.jpg';
+  if (typeof cleanAvatar === 'string' && cleanAvatar.startsWith('data:image') && (cleanAvatar.length <= 500 || !cleanAvatar.includes('base64,'))) {
+    cleanAvatar = '/MorP.jpg';
+  }
+
+  let cleanCover = dbUser.cover_url;
+  if (Buffer.isBuffer(cleanCover)) cleanCover = cleanCover.toString('utf8');
+  cleanCover = cleanCover || '';
+  if (typeof cleanCover === 'string' && cleanCover.startsWith('data:image') && (cleanCover.length <= 500 || !cleanCover.includes('base64,'))) {
+    cleanCover = '/morocco1.jpg';
+  }
+
+  let cleanStoryImage = dbUser.story_image_url;
+  if (Buffer.isBuffer(cleanStoryImage)) cleanStoryImage = cleanStoryImage.toString('utf8');
+  cleanStoryImage = cleanStoryImage || null;
+  if (typeof cleanStoryImage === 'string' && cleanStoryImage.startsWith('data:image') && (cleanStoryImage.length <= 500 || !cleanStoryImage.includes('base64,'))) {
+    cleanStoryImage = null;
+  }
+
   return {
     id: dbUser.id,
     name: dbUser.name,
     email: dbUser.email,
     role: dbUser.role,
     location: dbUser.location || '',
-    avatar: dbUser.avatar_url || '/MorP.jpg',
-    cover: dbUser.cover_url || '',
+    avatar: cleanAvatar,
+    cover: cleanCover,
     isVerified: !!dbUser.is_verified,
     bio: dbUser.bio || '',
     rating: parseFloat(dbUser.rating || 5.0),
     followersCount: parseInt(dbUser.followers_count || 0, 10),
-    storyImage: dbUser.story_image_url || null,
+    storyImage: cleanStoryImage,
     storyCreatedAt: dbUser.story_created_at || null,
     storyViewsCount: parseInt(dbUser.story_views_count || 0, 10),
     savedTours,
-    followingAgencies
+    followingAgencies,
+    credits: parseInt(dbUser.credits || 0, 10),
+    tourismLicenseNumber: dbUser.tourism_license_number || null,
+    licenseDocumentUrl: (dbUser.license_document_url && Buffer.isBuffer(dbUser.license_document_url)) 
+      ? dbUser.license_document_url.toString('utf8') 
+      : (dbUser.license_document_url || null)
   };
 };
 
@@ -57,7 +83,7 @@ export const mapUserResponse = async (dbUser) => {
  * @access Public
  */
 export const register = async (req, res) => {
-  const { name, email, password, role, location } = req.body;
+  const { name, email, password, role, location, tourismLicenseNumber, licenseDocumentUrl } = req.body;
 
   try {
     if (!name || !email || !password || !role) {
@@ -78,11 +104,13 @@ export const register = async (req, res) => {
     const defaultLocation = location || (role === 'agency' ? 'Marrakech, Morocco' : 'Tangier, Morocco');
     const defaultAvatar = '/MorP.jpg';
     const defaultCover = role === 'agency' ? '/morocco1.jpg' : '';
+    const license = role === 'agency' ? (tourismLicenseNumber || null) : null;
+    const documentUrl = role === 'agency' ? (licenseDocumentUrl || null) : null;
 
     // Insert user
     const [result] = await pool.query(
-      'INSERT INTO users (name, email, password, role, location, avatar_url, cover_url) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [name, email, hashedPassword, role, defaultLocation, defaultAvatar, defaultCover]
+      'INSERT INTO users (name, email, password, role, location, avatar_url, cover_url, tourism_license_number, license_document_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [name, email, hashedPassword, role, defaultLocation, defaultAvatar, defaultCover, license, documentUrl]
     );
 
     const newUserId = result.insertId;
@@ -256,5 +284,22 @@ export const deleteUser = async (req, res) => {
   } catch (error) {
     console.error('DeleteUser Error:', error);
     return res.status(500).json({ success: false, message: 'Server user delete error' });
+  }
+};
+
+/**
+ * Verify Agency
+ * @route PUT /api/auth/verify-agency/:id
+ * @access Private (Admin only)
+ */
+export const verifyAgency = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    await pool.query('UPDATE users SET is_verified = TRUE WHERE id = ?', [id]);
+    return res.status(200).json({ success: true, message: 'Agency verified successfully' });
+  } catch (error) {
+    console.error('VerifyAgency Error:', error);
+    return res.status(500).json({ success: false, message: 'Server verification error' });
   }
 };

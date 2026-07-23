@@ -52,3 +52,13 @@ export const restrictTo = (...roles) => {
     next();
   };
 };
+
+export const requireVerification = (req, res, next) => {
+  if (req.user && req.user.role === 'agency' && !req.user.is_verified) {
+    return res.status(403).json({
+      success: false,
+      message: 'Your agency account must be verified by an admin to perform this action.'
+    });
+  }
+  next();
+};
